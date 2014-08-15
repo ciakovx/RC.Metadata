@@ -1,3 +1,7 @@
+## This is unfinished code. I was playing around with searching for fields by string and so on.
+## It will be useful if doing any merging with the exported metadata, but the better option is to
+## fix the metadata from within DSpace rather than mess around with exported metadata.
+
 library(stringr)
 
 setwd("T:/RC.Metadata")
