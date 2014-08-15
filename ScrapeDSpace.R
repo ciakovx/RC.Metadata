@@ -13,6 +13,62 @@ library(stringr)
 #setwd("directory/RC.Metadata")
 
 #####################################################################################################################
+## community.data
+##
+## The community.data function gathers data on the community level from the file names, manually retrieving the total
+## number of items, and by scraping the community name. It requires a directory of metadata exported from DSpace, each
+## saved as CSV files.
+##
+## Argument:
+##    The directory in which the exported metadata is, assuming those files are named according to the convention
+##      10106-XXXX (number of X does not matter)
+##
+## Returns:
+##    A dataframe with the following fields:
+##      filename: name of file of exported metadata    
+##      handle: community handle
+##      number.of.items: total number of items in the community
+##      url.base: the base URL to the browse by title for each community
+##      community: the community name, as scraped from the url.base
+community.data <- function(directory){
+  all.files <- list.files(directory)
+  
+  # Start with the seventh character and take off the last five to get the community handle
+  handle <- sapply(all.files, function(z) as.numeric(str_sub(z, start=7, end = -5)))
+  
+  # These totals were manually derived. The total is generated on the fly and appears as "Now showing items 1-20 of 114."
+  # I could have done some string manipulation but decided simply to retrieve the total number of items manually.
+  number.of.items <- c(3156, 52, 3, 13, 89, NA, 140,
+                       150, 104, 395, 90, 5, 54, 10,
+                       NA, 9, NA, NA, 15, 1, 1, 75,
+                       93, 261, 131, NA, 102, 3, 2186,
+                       4, 6025, 72, 114)
+  
+  # Get the path to the community browse-by-title page
+  url.base <- paste0("http://dspace.uta.edu/handle/10106/", 
+                     handle, 
+                     "/browse?rpp=20&etal=-1&type=title&sort_by=1&order=ASC&offset=")
+  
+  # Parse the url for each url.base and grab the community name. If it can't get to the page, it will return NULL values,
+  # which cannot be unlisted. So NULL are converted to NA before unlisting.
+  community <- sapply(url.base, 
+                      function(z) {
+                        html <- htmlTreeParse(z, useInternalNodes=T)
+                        community <- xpathSApply(html, "//*[@id='ds-trail']/li[2]/a", xmlValue)
+                      })
+  community[unlist(lapply(community, is.null))] <- NA
+  final <- data.frame("filename" = all.files, 
+                      "handle" = unlist(handle),
+                      number.of.items,
+                      url.base,
+                      "community" = unlist(community),
+                      stringsAsFactors = FALSE)
+  return(final)
+}
+#####################################################################################################################
+
+
+#####################################################################################################################
 ## url.str
 ##
 ## The purpose of the url.str function is to return a vector of URLs for each page of 20 items in a given community. 
@@ -34,7 +90,7 @@ url.str <- function(handle, no.items){
   url.base <- paste0("http://dspace.uta.edu/handle/10106/", 
                      handle, 
                      "/browse?rpp=20&etal=-1&type=title&sort_by=1&order=ASC&offset=")
-  pgs <- floor(no.items / 20)
+    pgs <- floor(no.items / 20)
   
   # Create empty vector url.all to dump page URLs into. Then loop through and add to the string the multiple of 20 
   # per each number of pages (0 * 20), (1 * 20), (2 * 20), etc.
@@ -124,15 +180,16 @@ titles.urls <- function(z){
 #####################################################################################################################
 
 #####################################################################################################################
-## wrong.stats
+## months.stats
 ##
-## We had some incorrect statistics for April, May, June, and July 2014. This loop will collect those
+## We had some incorrect statistics for April, May, June, July, and August 2014. This loop will collect those
 ## statistics and return them to a dataframe. They can then be tallied and subtracted from the final.
-## This will only work for April-July. If it needs to be done in the future, the stop message in the final
-## if loop needs to be updated.
+## This will only work for April-August. If this function is run in the future, it will collect the last five months
+## of statistics but assign them under April-August (although it scrapes the month names, it only does to to check that
+## they are correct. The month names are manually placed into the final dataframe.)
 
 # Create an emply dataframe of three columns and rename those columns.
-wrong.stats <- function(z){
+months.stats <- function(z){
   # Create an emply dataframe of three columns and rename those columns.
   df <- data.frame(matrix(nrow=0, ncol=3))
   names(df) <- c("title", "url", "id")
@@ -164,20 +221,32 @@ wrong.stats <- function(z){
   for(i in seq_along(1:length(df$title))){
     perm.tmp <- htmlTreeParse(paste0('http://dspace.uta.edu',stats.url[i]),useInternalNodes=T)  # Parse statistics page
     stats <- xpathSApply(perm.tmp, "//*[@id='aspect_statistics_StatisticsTransformer_cell_02']", xmlValue)  # XPath to views
+    community <- xpathSApply(html, "//*[@id='ds-trail']/li[2]/a", xmlValue)
     
-    # If the item has zero total visits, it will appear as an empty list. 
-    # This loop says that if it's not a list (meaning, if it has view statistics), retrieve the total visits (the first item in the list)
-    # Sometimes there will be total visits but not file visits. If that is the case, file visits is NA. If not, retrieve the second item in the list.
-    # If the item is an empty list, put an NA value (it has no views)
-    # put the views. If it is, put NA.
+    #  If the item has zero total visits, it will appear as an empty list. 
+    # This loop says that if it's not a list (meaning, if it has view statistics), 
+    # scrape the stats page to collect the last five months of statistics. First it scrapes the months names and
+    # checks that they're right. It looks like the only time it throws the error is if they are blank, and if they are blank,
+    # it will put NA values for each month. If it isn't blank, grab the values corresponding to those months (the 6-10 values
+    # in the table) and put them in the dataframe.
     if(!is.list(stats)){ 
+      title <- xpathSApply(perm.tmp, "//*[@id='aspect_statistics_StatisticsTransformer_cell_01'][1]", xmlValue)
       month.names <- xpathSApply(perm.tmp, "//*[@class='ds-table-row odd']/td", xmlValue)
-      anomalies.names <- month.names[c(6, 7, 8, 9)]
-      if(all(anomalies.names != c("April 2014", "May 2014", "June 2014", "July 2014"))) stop("Something is wrong with the months")
-      month.views <- xpathSApply(perm.tmp, "//*[@class='ds-table-row even']/td", xmlValue)
-      anomalies.views <- rbind(as.numeric(month.views[c(6,7,8,9)]))
-      m <- rbind(m, anomalies.views)
+      anomalies.names <- month.names[c(6:10)]
+      if(all(anomalies.names != c("April 2014", "May 2014", "June 2014", "July 2014", "August 2014"))) {
+        warning(paste("No views in April-August for", title, "in", community))
+        m <- rbind(m, NA)
+        } else {
+          month.views <- xpathSApply(perm.tmp, "//*[@class='ds-table-row even']/td", xmlValue)
+          anomalies.views <- rbind(as.numeric(month.views[c(6:10)]))
+          m <- rbind(m, anomalies.views)
+        }
       
+      # If the item has zero total visits, it will appear as an empty list. 
+      # This loop says that if it's not a list (meaning, if it has view statistics), retrieve the total visits (the first item in the list)
+      # Sometimes there will be total visits but not file visits. If that is the case, file visits is NA. If not, retrieve the second item in the list.
+      # If the item is an empty list, put an NA value (it has no views)
+      # put the views. If it is, put NA.
       total.visits <- as.numeric(stats[1])  # Get the first value and convert it to numeric
       if(length(stats) == 4){
         file.visits <- as.numeric(stats[2])
@@ -191,7 +260,7 @@ wrong.stats <- function(z){
       n <- rbind(n, NA) 
     }
   }
-  names(m) <- c("April 2014", "May 2014", "June 2014", "July 2014")
+  names(m) <- c("April 2014", "May 2014", "June 2014", "July 2014", "August 2014")
   names(n) <- c("total.visits", "file.visits")
   final.anomalies <- cbind(df, n, m)
   return(final.anomalies)
