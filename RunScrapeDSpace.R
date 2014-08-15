@@ -4,8 +4,6 @@ source(file.path(".", "code", "ScrapeDSpace.R"))
 #############################################################################
 ## RUNNING FUNCTIONS FROM ScrapeDSpace.R
 #############################################################################
-
-
 ed.url.str <- url.str(11235, 51)
 ed.titles <- titles.urls(ed.url.str)
 ed.wrong.stats <- wrong.stats(ed.url.str)
@@ -62,3 +60,35 @@ stats.barplot.titles(etd.titles, top = 20)
 visit.cor(etd.titles)
 
 stats.barplot(etd50)
+
+
+
+
+
+
+
+
+
+
+all.community.data <- community.data("T:/RC.Metadata/data/ExportedMetadata")
+
+
+get.all <- function(comm.data){
+  all.community.data <- comm.data
+  all.community.data <- all.community.data[complete.cases(all.community.data$number.of.items), ]
+  for(i in 1:nrow(all.community.data)){
+    local.url.str <- url.str(all.community.data[i, 2], all.community.data[i, 3])
+    local.months.stats <- months.stats(local.url.str)
+    final <- data.frame("community" = rep(all.community.data$community[i], nrow(local.months.stats)), 
+                        local.months.stats)
+    write.csv(final, file = paste0("./results/", all.community.data$handle[i], "_statistics", ".csv"), row.names = FALSE)
+  }
+}
+
+get.all(all.community.data)
+
+
+
+url.str(1, )
+
+
