@@ -1,46 +1,151 @@
+## The purpose of these functions is to run functions sourced from ScrapeDSpace. There are actual functions that loop
+## through files saved in the RC.Metadata/data folder, and also one liners used to demo the code from within RStudio.
+
 setwd("T:/RC.Metadata")
-source(file.path(".", "code", "ScrapeDSpace.R"))
+source(file.path("./RC.Metadata", "ScrapeDSpace.R"))
+
+
+
+#####################################################################################################################
+## get.all.titles
+##
+## The get.all function uses the data generated from the community.data function as variables in the
+## url.str and titles.stats functions to gather the statistics data and return a data frame. 
+## It requires ScrapeDSpace.R to be sourced, and community.data to be run first.
+##
+## Argument:
+##    comm.data: the community data function returned to "all.community.data"
+##
+## Returns:
+##    CSVs for each community, saved in the specified directory. These CSVs will be joined with data from
+##    the community.data function and variables include:
+##      community: name of community (scraped from page in community.data function)
+##      title: item title
+##      url: Item URL (/handle/10106/itemhandle)
+##      x.handle: Item handle. Used 
+##      total.visits: Total view statistics for the item page
+##      file.visits: Total view statistics for the item bitstream (downloads)
+all.community.data <- community.data("T:/RC.Metadata/data/ExportedMetadata/Public")
+get.all.titles <- function(comm.data){
+  all.community.data <- comm.data
+  for(i in 1:nrow(all.community.data)){
+    local.url.str <- url.str(all.community.data[i, 2], all.community.data[i, 3])
+    local.titles.urls <- titles.urls(local.url.str)
+    final <- data.frame("community" = rep(all.community.data$community[i], nrow(local.titles.urls)), 
+                        local.titles.urls)
+    write.csv(final, file = paste0("T:/RC.Metadata/results/2014-08-15/tables/view.statistics"), row.names = FALSE)
+  }
+}
+
+get.all.titles(all.community.data)
+#####################################################################################################################
+
+#####################################################################################################################
+## get.all.months
+##
+## The get.all.months function uses the data generated from the community.data function as variables in the
+## url.str and months.stats functions to gather the statistics data and return a data frame. ONLY use this function
+## to return statistics from April-August 2014. Otherwise use the get.all function.
+## It requires ScrapeDSpace.R to be sourced, and community.data to be run first.
+##
+## Argument:
+##    comm.data: the community data function returned to "all.community.data"
+##
+## Returns:
+##    CSVs for each community, saved in the specified directory. These CSVs will be joined with data from
+##    the community.data function and variables include:
+##      community: name of community (scraped from page in community.data function)
+##      title: item title
+##      url: Item URL (/handle/10106/itemhandle)
+##      x.handle: Item handle. Used 
+##      total.visits: Total view statistics for the item page
+##      file.visits: Total view statistics for the item bitstream (downloads)
+##      April.2014: Total view statistics for the item page in April
+##      May.2014: Total view statistics for the item page in May
+##      June.2014: Total view statistics for the item page in June
+##      July.2014: Total view statistics for the item page in July
+##      August.2014: Total view statistics for the item page in August
+all.community.data <- community.data("T:/RC.Metadata/data/ExportedMetadata/Public")
+get.all.months <- function(get.all.titles.directory){
+  all.community.data <- comm.data
+  for(i in 1:nrow(all.community.data)){
+    local.url.str <- url.str(all.community.data[i, 2], all.community.data[i, 3])
+    local.months.stats <- months.stats(local.url.str)
+    final <- data.frame("community" = rep(all.community.data$community[i], nrow(local.months.stats)), 
+                        local.months.stats)
+    write.csv(final, file = paste0("./results/2014-08-15/tables/view.statistics/10106-", all.community.data$handle[i], "_statistics", ".csv"), row.names = FALSE)
+  }
+}
+
+get.all.months(all.community.data)
+#####################################################################################################################
+
+#####################################################################################################################
+## get.all.visit.cor
+##
+## Uses exported metadata, all.community.data and visits.cor to get a correlation between file visits and total visits for
+## each RC community and saves them to a folder.
+##
+## Argument:
+##    comm.data: the community data function returned to "all.community.data"
+##
+## Returns:
+##    Plots for each community saved to the specified directory.
+get.all.visit.cor <- function(get.all.titles.directory){
+  local.dir <- file.path(getwd(), "results", get.all.titles.directory)
+  all.files <- list.files(local.dir)
+  for(i in 1:length(all.files)){
+    x <- read.csv(file.path(local.dir, all.files[i]))
+    visit.cor(x)
+    ggsave(paste0("./results/2014-08-15/plots/visit.cor/", str_sub(all.files[i], end=-16), "_visitcor", ".png"), width=15, height=15)
+  }
+}
+get.all.visit.cor("2014-08-15/tables/view.statistics/")
+#####################################################################################################################
+
+#####################################################################################################################
+## get.all.stats.barplot.titles
+##
+## The get.all.stats.barplot.titles function returns barplots for the top.x items in each community.
+get.all.stats.barplot.titles <- function(get.all.titles.directory, top.x) {
+  local.dir <- file.path(getwd(), "results", get.all.titles.directory)
+  all.files <- list.files(local.dir)
+  for(i in 1:length(all.files)){
+    x <- read.csv(file.path(local.dir, all.files[i]))
+    stats.barplot.titles(x, top = top.x)
+    ggsave(paste0("./results/2014-08-15/plots/stats.barplot.titles/", str_sub(all.files[i], end=-16), "_barplot.titles", ".png"), width=15, height=15)
+  }
+}
+get.all.stats.barplot.titles("2014-08-15/tables/view.statistics/", 20)
+#####################################################################################################################
+
+
+
+
 
 #############################################################################
-## RUNNING FUNCTIONS FROM ScrapeDSpace.R
+## EXAMPLE FUNCTIONS FROM ScrapeDSpace.R
 #############################################################################
+
 ed.url.str <- url.str(11235, 51)
 ed.titles <- titles.urls(ed.url.str)
-ed.wrong.stats <- wrong.stats(ed.url.str)
+ed.months.stats <- months.stats(ed.url.str)
 
-ed.merged <- metadata.merge(ed.titles, 11235)
-ed.merged.cl <- community.metadata.clean(ed.merged)
 ed.summary <- df.summary.stats(ed.titles)
 # Graphing
 visit.cor(ed.titles)
 stats.barplot.titles(ed.titles)
-stats.barplot.titles(ed.titles, 10)
-stats.barplot.merged(ed.merged.cl)
-stats.barplot.merged(ed.merged.cl, top = 10)
-stats.barplot.merged(ed.merged.cl, fill.value = "year")
-stats.barplot.merged(ed.merged.cl, fill.value = "year", top = 10)
-stats.barplot.merged(ed.merged.cl, fill.value = "author", top = 10)
-stats.barplot.merged(ed.merged.cl, fill.value = "type", top = 10)
+stats.barplot.titles(ed.titles, 20)
 
 
 
 phys.url.str <- url.str(4972, 93)
 phys.titles <- titles.urls(phys.url.str)
-phys.merged <- metadata.merge(phys.titles, 4972)
-phys.merged.cl <- community.metadata.clean(phys.merged)
 phys.summary <- stats.barplot.titles(phys.titles)
-stats.barplot.merged(phys.merged.cl)
-stats.barplot.merged(phys.merged.cl, "year")
-stats.barplot.merged(phys.merged.cl, "year", 10)
-stats.barplot.merged(phys.merged.cl, "author", 10)
-stats.barplot.merged(phys.merged.cl, "type", 10)
 
 elec.url.str <- url.str(4968, 75)
 elec.titles <- titles.urls(elec.url.str)
-elec.merged <- metadata.merge(phys.titles, 4968)
-elec.merged.cl <- community.metadata.clean(elec.merged)
 stats.barplot.titles(elec.titles)
-stats.barplot.merged(elec.merged.cl)
 
 spco.url.str <- url.str(5194, 131)
 spco.titles <- titles.urls(spco.url.str)
@@ -48,11 +153,7 @@ stats.barplot.titles(spco.titles)
 
 nursing.url.str <- url.str(1971, 54)
 nursing.titles <- titles.urls(nursing.url.str)
-nursing.merged <- metadata.merge(nursing.titles, 1971)  
-nursing.merged.cl <- community.metadata.clean(nursing.merged)
 stats.barplot.titles(nursing.merged)
-stats.barplot.merged(nursing.merged.cl, "year", 20)
-stats.barplot.merged(nursing.merged.cl, "author", 10)
 
 etd.url.str <- url.str(2, 2759)
 etd.titles <- titles.urls(etd.url.str)
@@ -70,25 +171,22 @@ stats.barplot(etd50)
 
 
 
-all.community.data <- community.data("T:/RC.Metadata/data/ExportedMetadata")
 
-
-get.all <- function(comm.data){
-  all.community.data <- comm.data
-  all.community.data <- all.community.data[complete.cases(all.community.data$number.of.items), ]
-  for(i in 1:nrow(all.community.data)){
-    local.url.str <- url.str(all.community.data[i, 2], all.community.data[i, 3])
-    local.months.stats <- months.stats(local.url.str)
-    final <- data.frame("community" = rep(all.community.data$community[i], nrow(local.months.stats)), 
-                        local.months.stats)
-    write.csv(final, file = paste0("./results/", all.community.data$handle[i], "_statistics", ".csv"), row.names = FALSE)
-  }
-}
-
-get.all(all.community.data)
 
 
 
 url.str(1, )
 
 
+k <- list.files("T:/RC.Metadata/results/2014-08-15/tables/view.statistics")
+for (i in 1:length(k)){
+  x <- read.csv(paste0("T:/RC.Metadata/results/2014-08-15/tables/view.statistics/", k[i]))
+  names(x)[1] <- "community"
+  names(x)[11] <- "August.2014"
+  write.csv(x, file = paste0("T:/RC.Metadata/results/2014-08-15/tables/two/", k[i]), row.names = FALSE)  
+}
+for (i in 1:length(k)){
+  x <- read.csv(paste0("T:/RC.Metadata/results/2014-08-15/tables/view.statistics/", k[i]))
+  write.csv(x, file = paste0("T:/RC.Metadata/results/2014-08-15/tables/two/", "10106-", k[i]), row.names = FALSE)
+  
+}
