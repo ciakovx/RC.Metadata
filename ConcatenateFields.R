@@ -18,20 +18,20 @@ all.files <- function(directory){
   dirct <- file.path(getwd(), directory) 
   files <- list.files(dirct) 
   filepath <- file.path(dirct, files) 
-  all.files <- lapply(filepath, read.csv, check.names = FALSE, na.strings = "")
+  all.files <- lapply(filepath, read.csv, check.names = TRUE, na.strings = "")
   return(all.files)
 }
-rc.files <- all.files("data")
+rc.files <- all.files("data/ExportedMetadata/Public")
 
 # Return the full set of tags and extract the unique elements
 rc.nm.list <- lapply(rc.files, colnames)  # Tags for each community
 rc.nm <- as.character(matrix(unlist(rc.nm.list)))
-rc.nm <- unique(rc.nm)  # Unique metadata tags across RC
+rc.nm.unq <- unique(rc.nm)  # Unique metadata tags across RC
 
 # Return each element & its variation to a separate vector in a list
 zz <- vector("list")
 grouped.elements <- function(elements.vec){
-  lq <- for(i in 1:length(elements.regex)){
+  lq <- for(i in 1:length(dc.elements.regex)){
     y <- str_extract(elements.vec, dc.elements.regex[i])
     y <- y[complete.cases(y)]
     zz[[i]] <- y
