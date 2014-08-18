@@ -9,8 +9,8 @@ library(ggplot2)
 library(stringr)
 
 # Set your working directory to the folder including this code and data. 
-# Example: setwd("T:/RC.Metadata")
-#setwd("directory/RC.Metadata")
+# Example: setwd("your directory/RC.Metadata")
+setwd("T:/RC.Metadata")
 
 #####################################################################################################################
 ## community.data
@@ -38,7 +38,7 @@ community.data <- function(directory){
   
   # These totals were manually derived. The total is generated on the fly and appears as "Now showing items 1-20 of 114."
   # I could have done some string manipulation but decided simply to retrieve the total number of items manually.
-  number.of.items <- c(3156, 52, 3, 13, 89, 140,
+   number.of.items <- c(3156, 52, 3, 13, 89, 140,
                        150, 104, 395, 90, 5, 54, 10,
                        9, 15, 1, 1, 75,
                        93, 261, 131, 102, 3, 2186,
@@ -193,8 +193,8 @@ titles.urls <- function(z){
 # Create an emply dataframe of three columns and rename those columns.
 months.stats <- function(z){
   # Create an emply dataframe of three columns and rename those columns.
-  df <- data.frame(matrix(nrow=0, ncol=3))
-  names(df) <- c("title", "url", "id")
+  df <- data.frame(matrix(nrow = 0, ncol = 4))
+  names(df) <- c("title", "url", "id", "community")
   
   # The first loop parses the first page of the url.str vector. dc.identifier.uri uses the XPath to retrieve the 
   # href tag for permanent handle. dc.title uses the XPath to retrieve item title. It is then converted to utf-8 because some
@@ -207,9 +207,11 @@ months.stats <- function(z){
     dc.title <- xpathSApply(html, "//*[@id=\'aspect_artifactbrowser_ConfigurableBrowse_div_browse-by-title-results\']/ul/li/div/div/a/span", xmlValue)  
     dc.title <- iconv(dc.title, "latin1", "utf-8")  
     x.handle <- data.frame("x.handle" = as.numeric(str_sub(dc.identifier.uri, start=15)))
+    community <- xpathSApply(html, "//*[@id='ds-trail']/li[2]/a", xmlValue)
     x <- data.frame("title" = dc.title, 
                     "url" = dc.identifier.uri,
-                    "x.handle" = x.handle)
+                    "x.handle" = x.handle,
+                    "community" = community)
     df <- rbind(df, x)
   }
   
@@ -223,27 +225,30 @@ months.stats <- function(z){
   for(i in seq_along(1:length(df$title))){
     perm.tmp <- htmlTreeParse(paste0('http://dspace.uta.edu',stats.url[i]),useInternalNodes=T)  # Parse statistics page
     stats <- xpathSApply(perm.tmp, "//*[@id='aspect_statistics_StatisticsTransformer_cell_02']", xmlValue)  # XPath to views
-    community <- xpathSApply(html, "//*[@id='ds-trail']/li[2]/a", xmlValue)
     
     #  If the item has zero total visits, it will appear as an empty list. 
     # This loop says that if it's not a list (meaning, if it has view statistics), 
     # scrape the stats page to collect the last five months of statistics. First it scrapes the months names and
-    # checks that they're right. It looks like the only time it throws the error is if they are blank, and if they are blank,
-    # it will put NA values for each month. If it isn't blank, grab the values corresponding to those months (the 6-10 values
+    # checks that they're right. It will throw an error if there are any NA values, if they are different, or if 
+    # they are blank (i.e. have no views in the last six months. If they don't match or are blank,
+    # it will put NA values for each month. If they do match, grab the values corresponding to those months (the 6-10 values
     # in the table) and put them in the dataframe.
     if(!is.list(stats)){ 
       title <- xpathSApply(perm.tmp, "//*[@id='aspect_statistics_StatisticsTransformer_cell_01'][1]", xmlValue)
       month.names <- xpathSApply(perm.tmp, "//*[@class='ds-table-row odd']/td", xmlValue)
       anomalies.names <- month.names[c(6:10)]
-      if(all(anomalies.names != c("April 2014", "May 2014", "June 2014", "July 2014", "August 2014"))) {
-        warning(paste("No views in April-August for", title, "in", community))
+      if(is.na(all(anomalies.names != c("April 2014", "May 2014", "June 2014", "July 2014", "August 2014")))){
         m <- rbind(m, NA)
-        } else {
-          month.views <- xpathSApply(perm.tmp, "//*[@class='ds-table-row even']/td", xmlValue)
-          anomalies.views <- rbind(as.numeric(month.views[c(6:10)]))
-          m <- rbind(m, anomalies.views)
-        }
-      
+      } else {
+        if(all(anomalies.names != c("April 2014", "May 2014", "June 2014", "July 2014", "August 2014"))) {
+          warning(paste("The months for", title, "in", community, "are either blank or are not April-August 2014"))
+          m <- rbind(m, NA)
+          } else {
+            month.views <- xpathSApply(perm.tmp, "//*[@class='ds-table-row even']/td", xmlValue)
+            anomalies.views <- rbind(as.numeric(month.views[c(6:10)]))
+            m <- rbind(m, anomalies.views)
+          }
+      }
       # If the item has zero total visits, it will appear as an empty list. 
       # This loop says that if it's not a list (meaning, if it has view statistics), retrieve the total visits (the first item in the list)
       # Sometimes there will be total visits but not file visits. If that is the case, file visits is NA. If not, retrieve the second item in the list.
@@ -292,13 +297,15 @@ stats.barplot.titles <- function(titles.df, top){
   # Sort title by number of file visits and eliminate titles for which there are no (NA) visits
   titles.df$title <- str_wrap(titles.df$title, width = 50)
   titles.df$views.ordered <- reorder(titles.df$title, titles.df$file.visits) 
-  titles.df <- titles.df[complete.cases(titles.df$file.visits), ]  # 
-  community.name <- titles.df$community[1]
+  titles.df <- titles.df[complete.cases(titles.df$file.visits), ]
+  community.name <- as.character(titles.df$community[1])
+  
   # If "top" is passed, reorder the df according to visits and take the top first through the value passed to top
   if(!missing(top)){
     titles.df <- titles.df[with(titles.df, order(-file.visits)), ]  
     titles.df <- titles.df[1:top, ]  
   }
+  
   graph <- ggplot(data=titles.df) +
     aes(views.ordered, file.visits) +
     geom_bar(stat="identity") +
