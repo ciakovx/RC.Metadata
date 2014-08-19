@@ -5,6 +5,7 @@
 library(stringr)
 
 setwd("T:/RC.Metadata")
+source(file.path("./RC.Metadata", "ScrapeDSpace.R"))
 
 elements <- c("contributor", "coverage", "creator", "date", "description", "format", 
                  "identifier", "language", "publisher", "relation", "rights", "source", 
@@ -18,15 +19,24 @@ all.files <- function(directory){
   dirct <- file.path(getwd(), directory) 
   files <- list.files(dirct) 
   filepath <- file.path(dirct, files) 
-  all.files <- lapply(filepath, read.csv, check.names = TRUE, na.strings = "")
+  all.files <- lapply(filepath, read.csv, check.names = FALSE, na.strings = "")
   return(all.files)
 }
 rc.files <- all.files("data/ExportedMetadata/Public")
 
 # Return the full set of tags and extract the unique elements
-rc.nm.list <- lapply(rc.files, colnames)  # Tags for each community
+# Tags for each community
+rc.nm.list <- lapply(rc.files, colnames)  
+all.community.data <- community.data("T:/RC.Metadata/data/ExportedMetadata/Public")
+# Write tags for each community to CSV
+for(i in 1:length(rc.nm.list)){
+  write.csv(rc.nm.list[[i]], file = paste0("T:/RC.Metadata/results/CHANGE.THIS.DATE/tables/metadata/fields.by.community/10106-", all.community.data$handle[i], "_metadata", ".csv"), row.names = FALSE)
+}
+# Unique tags across DSpace
 rc.nm <- as.character(matrix(unlist(rc.nm.list)))
 rc.nm.unq <- unique(rc.nm)  # Unique metadata tags across RC
+write.csv(rc.nm.unq, file = paste0("T:/RC.Metadata/results/2014-08-18/tables/metadata/unique.fields.csv"), row.names = FALSE)
+
 
 # Return each element & its variation to a separate vector in a list
 zz <- vector("list")
@@ -39,12 +49,15 @@ grouped.elements <- function(elements.vec){
   return(zz)
 }
 rc.nm.grp <- grouped.elements(rc.nm.unq)
+for(i in 1:length(rc.nm.grp)){
+  write.csv(rc.nm.grp[[i]], file = paste0("T:/RC.Metadata/results/2014-08-18/tables/metadata/unique.fields.by.element/", dc.elements[i], "_fields", ".csv"), row.names = FALSE)
+}
 
 
 
-
-
-
+##########################
+# UNFINISHED
+##########################
 
 #Experimenting with looping through each file and collecting all elements into separate items
 r <- rc.files[[1]]
