@@ -8,7 +8,8 @@ source(file.path("./RC.Metadata", "ScrapeDSpace.R"))
 ##
 ## The metadata.merge function merges the metadata as exported from DSpace with the dataframe returned from titles.urls. 
 ## This function requires you to download the metadata from the community
-## from DSpace, with admin privileges. Save the metadata CSV file, with the filename as the community.
+## from DSpace, with admin privileges. Save the metadata CSV file, with the filename as the community.The merge is by item
+## handle, which needs to be extracted from the community.uri string.
 ## 
 ## Arguments: 
 ##   titles.df: Data Frame. Returned from the titles.urls function
@@ -16,22 +17,22 @@ source(file.path("./RC.Metadata", "ScrapeDSpace.R"))
 ##
 ## Returns:
 ##   Data frame of total visits, file visits, and full exported metadata merged
-metadata.merge <- function(titles.df, community){
+metadata.merge <- function(titles.df, community.handle){
   # Read in the CSV for the metadata as exported from ResearchCommons.
-  community.df <- read.csv(file=paste0(getwd(), "/data", "/ExportedMetadata/Public", "/10106-", community, ".csv"), na.strings="") 
+  community.df <- read.csv(file=paste0(getwd(), "/data", "/ExportedMetadata/Public", "/10106-", community.handle, ".csv"), na.strings="") 
   
   # These two if loops concatenate columns variously named dc.identifier.uri. and dc.identifier.uri.. (note the periods at the end)
   if(any(names(community.df == "community.df$dc.identifier.uri."))){
-    community.uri <- ifelse(is.na(community.df$dc.identifier.uri),
+    identifier.uri <- ifelse(is.na(community.df$dc.identifier.uri),
                             as.character(community.df$dc.identifier.uri.),as.character(community.df$dc.identifier.uri))  # Merges the two different uri fields based on NA values
   }
   if(any(names(community.df) == "dc.identifier.uri..")){
-    community.uri <- ifelse(is.na(community.df$dc.identifier.uri),
+    identifier.uri <- ifelse(is.na(community.df$dc.identifier.uri),
                             as.character(community.df$dc.identifier.uri..),as.character(community.df$dc.identifier.uri))  # Merges the two different uri fields based on NA values    
   }
   
   # Take away the first 29 characters to leave the handle & returns handle as character, bind the handle 
-  # vector to the metadata dataframe, and merge the visits dataframe with the metadata. Create a column called "department"
+  # vector to the metadata dataframe, and merge the visits dataframe with the metadata. Create a column called "community"
   # that includes the community handle and bind that to the final dataframe.
   y.handle <-  data.frame("y.handle" = as.numeric(str_sub(community.uri, start=29)))  
   community.df <- data.frame(community.df, y.handle)  
